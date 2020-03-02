@@ -1,6 +1,6 @@
-# oba-reader
+# Oba Reading help
 
-> A webapp that can read and explain book pages to you
+> A webapp that can read and explain book pages to you using microsoft Azure cloud AI services
 
 ## Build Setup
 
