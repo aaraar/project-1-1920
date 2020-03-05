@@ -1,7 +1,7 @@
 const colors = require('vuetify/es5/util/colors').default
 
 module.exports = {
-  mode: 'spa',
+  mode: 'universal',
   /*
   ** Headers of the page
   */
@@ -14,7 +14,7 @@ module.exports = {
       { hid: 'description', name: 'description', content: process.env.npm_package_description || '' }
     ],
     link: [
-      { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }
+      { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
     ]
   },
   /*
@@ -28,8 +28,9 @@ module.exports = {
   ],
   /*
   ** Plugins to load before mounting the App
-  */
+  // */
   plugins: [
+  //   '~/plugins/responsiveVoice'
   ],
   /*
   ** Nuxt.js dev-modules
@@ -84,4 +85,4 @@ module.exports = {
     extend (config, ctx) {
     }
   }
-}
+};

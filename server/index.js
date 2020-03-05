@@ -2,33 +2,26 @@ require('dotenv').config();
 const express = require ( 'express' );
 const consola = require ( 'consola' );
 const { Nuxt, Builder } = require ( 'nuxt' );
-const app = express ();
-const async = require ( 'async' );
-const fs = require ( 'fs' );
-const path = require ( "path" );
-const createReadStream = require ( 'fs' ).createReadStream;
-const sleep = require ( 'util' ).promisify ( setTimeout );
-const ComputerVisionClient = require ( '@azure/cognitiveservices-computervision' ).ComputerVisionClient;
-const ApiKeyCredentials = require ( '@azure/ms-rest-js' ).ApiKeyCredentials;
+const app = express();
+const xmlbuilder = require('xmlbuilder');
+const rp = require('request-promise');
+const fs = require('fs');
+const readline = require('readline-sync');
+const bodyParser = require('body-parser');
+const fetch = require('node-fetch');
 
 // Import and Set Nuxt.js options
 const config = require ( '../nuxt.config.js' );
 config.dev = process.env.NODE_ENV !== 'production';
 
-let key = process.env['COMPUTER_VISION_SUBSCRIPTION_KEY']
-let endpoint = process.env['COMPUTER_VISION_ENDPOINT'];
-if (!key) { throw new Error('Set your environment variables for your subscription key and endpoint.'); }
-
-let computerVisionClient = new ComputerVisionClient(
-  new ApiKeyCredentials({inHeader: {'Ocp-Apim-Subscription-Key': key}}), endpoint);
-
 async function start() {
+
+  app.get('/tts/:query', main);
+
   // Init Nuxt.js
   const nuxt = new Nuxt ( config );
 
   const { host, port } = nuxt.options.server;
-
-  // Build only in dev mode
   if ( config.dev ) {
     const builder = new Builder ( nuxt );
     await builder.build ()
@@ -39,65 +32,6 @@ async function start() {
   // Give nuxt middleware to express
   app.use ( nuxt.render );
 
-  function computerVision() {
-    async.series([
-      async function () {
-        const describeImagePath = __dirname + '/exImg.jpg';
-        // console.log('-------------------------------------------------');
-        // console.log('DESCRIBE IMAGE');
-        // console.log();
-        // // Analyze local image
-        // console.log('Analyzing local image to describe...', path.basename(describeImagePath));
-        // // DescribeImageInStream takes a function that returns a ReadableStream, NOT just a ReadableStream instance.
-        // var caption = (await computerVisionClient.describeImageInStream(
-        //   () => createReadStream(describeImagePath))).captions[0];
-        // console.log(`This may be ${caption.text} (${caption.confidence.toFixed(2)} confidence)`);
-        /**
-         * END - Describe Image
-         */
-        console.log();
-        console.log('Recognizing printed text...', describeImagePath);
-        var printed = await recognizeText(computerVisionClient, 'Printed', describeImagePath);
-        printRecText(printed);
-        async function recognizeText(client, mode, localImagePath) {
-
-          // To recognize text in a local image, replace client.recognizeText() with recognizeTextInStream() as shown:
-          // result = await client.recognizeTextInStream(mode, () => createReadStream(localImagePath));
-          let result = await client.recognizeTextInStream(mode, () => createReadStream(localImagePath));
-          // Operation ID is last path segment of operationLocation (a URL)
-          let operation = result.operationLocation.split('/').slice(-1)[0];
-
-          // Wait for text recognition to complete
-          // result.status is initially undefined, since it's the result of recognizeText
-          while (result.status !== 'Succeeded') { await sleep(1000); result = await client.getTextOperationResult(operation); }
-          return result.recognitionResult;
-        }
-        // </snippet_read_helper>
-
-        // <snippet_read_print>
-        // Prints all text from OCR result
-        function printRecText(ocr) {
-          if (ocr.lines.length) {
-            console.log('Recognized text:');
-            for (let line of ocr.lines) {
-              console.log(line.words.map(w => w.text).join(' '));
-            }
-          }
-          else { console.log('No recognized text.'); }
-        }
-      },
-      function () {
-        return new Promise((resolve) => {
-          resolve();
-        })
-      }
-    ], (err) => {
-      throw (err);
-    });
-  }
-  // computerVision();
-
-
   // Listen the server
   app.listen ( port, host );
   consola.ready ( {
@@ -107,3 +41,78 @@ async function start() {
 }
 
 start ();
+
+// Gets an access token.
+function getAccessToken(subscriptionKey) {
+  let options = {
+    method: 'POST',
+    uri: 'https://westeurope.api.cognitive.microsoft.com/sts/v1.0/issuetoken',
+    headers: {
+      'Ocp-Apim-Subscription-Key': subscriptionKey
+    }
+  };
+  return rp(options);
+}
+
+// Converts text to speech using the input from readline.
+function textToSpeech(accessToken, req, res) {
+  // Create the SSML request.
+  let xml_body = xmlbuilder.create('speak')
+    .att('version', '1.0')
+    .att('xml:lang', 'nl-nl')
+    .ele('voice')
+    .att('xml:lang', 'nl-nl')
+    .att('name', 'Microsoft Server Speech Text to Speech Voice (nl-NL, HannaRUS)') // Short name for 'Microsoft Server Speech Text to Speech Voice (en-US, Guy24KRUS)'
+    .txt(decodeURIComponent(req.params.query))
+    .end();
+  // Convert the XML into a string to send in the TTS request.
+  let body = xml_body.toString();
+
+  let options = {
+    method: 'POST',
+    baseUrl: 'https://westeurope.tts.speech.microsoft.com/',
+    url: 'cognitiveservices/v1',
+    headers: {
+      'Authorization': 'Bearer ' + accessToken,
+      'cache-control': 'no-cache',
+      'User-Agent': process.env.SPEECH_SERVICE_RESOURCE_NAME,
+      'X-Microsoft-OutputFormat': 'riff-24khz-16bit-mono-pcm',
+      'Content-Type': 'application/ssml+xml'
+    },
+    body: body
+  };
+
+  let request = rp(options)
+    .on('response', (response) => {
+      if (response.statusCode === 200) {
+        res.set('content-type', 'audio/wav');
+        res.set('accept-ranges', 'bytes');
+        request.pipe(res);
+      }
+    });
+  return request;
+
+}
+
+// Use async and await to get the token before attempting
+// to convert text to speech.
+async function main(req, res) {
+  // Reads subscription key from env variable.
+  // You can replace this with a string containing your subscription key. If
+  // you prefer not to read from an env variable.
+  // e.g. const subscriptionKey = "your_key_here";
+  const subscriptionKey = process.env.SPEECH_SERVICE_SUBSCRIPTION_KEY;
+  if (!subscriptionKey) {
+    throw new Error('Environment variable for your subscription key is not set.')
+  }
+
+  try {
+    const accessToken = await getAccessToken(subscriptionKey);
+    await textToSpeech(accessToken, req, res);
+  } catch (err) {
+    console.log(`Something went wrong: ${err}`);
+  }
+}
+
+// Run the application
+// main();

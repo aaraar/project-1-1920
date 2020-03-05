@@ -1,23 +1,56 @@
 <template>
-      <v-row align="start" justify="center">
-      <v-card class="ma-6">
-        <v-card-title class="headline">
-          Live
-        </v-card-title>
-        <video id="video" autoplay></video>
-        <v-card-actions>
-          <v-btn @click="startWebcam()" class="ma-3">Start WebCam</v-btn>
-          <v-btn id="takeSnap" :disabled="snapDisable" class="ma-3">Take Snapshot</v-btn>
-          <v-btn @click="stopWebcam()" class="ma-3">Stop WebCam</v-btn>
-        </v-card-actions>
-      </v-card>
-      <v-card class="ma-6">
-        <v-card-title class="headline">
-          Snapshot
-        </v-card-title>
-        <canvas id="sourceImage"></canvas>
-      </v-card>
-      </v-row>
+  <v-container>
+    <v-row>
+      <v-flex row wrap justify="center" class="justify-center">
+        <v-card class="ma-3">
+          <v-card-title class="headline">
+            Live
+          </v-card-title>
+          <video id="video" autoplay></video>
+          <v-card-actions>
+            <v-btn @click="startWebcam()" class="ma-3">Start WebCam</v-btn>
+            <v-btn id="takeSnap" :disabled="snapDisable" class="ma-3">Take Snapshot</v-btn>
+            <v-btn @click="stopWebcam()" class="ma-3">Stop WebCam</v-btn>
+          </v-card-actions>
+        </v-card>
+        <v-card class="ma-3" :data-snap-taken="snapTaken">
+          <v-card-title class="headline">
+            Snapshot
+          </v-card-title>
+          <canvas id="sourceImage"></canvas>
+        </v-card>
+      </v-flex>
+    </v-row>
+    <v-row>
+      <v-flex row wrap justify="center" class="justify-center">
+        <v-card class="ma-3" v-if="readedText">
+          <v-card-title class="headline">
+            Text
+          </v-card-title>
+          <v-card-text class="ma-3" id="result">
+            <a @click="noLink" :href="createTtsHref(word)" v-for="(word, index) in readedWords" :key="index"
+               class="word">
+              {{ word }}
+              <div class="word-pop-up">
+                <svg @click="playWord" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="volume-up"
+                     class="svg-inline--fa fa-volume-up fa-w-18" role="img" xmlns="http://www.w3.org/2000/svg"
+                     viewBox="0 0 576 512">
+                  <path fill="currentColor"
+                        d="M215.03 71.05L126.06 160H24c-13.26 0-24 10.74-24 24v144c0 13.25 10.74 24 24 24h102.06l88.97 88.95c15.03 15.03 40.97 4.47 40.97-16.97V88.02c0-21.46-25.96-31.98-40.97-16.97zm233.32-51.08c-11.17-7.33-26.18-4.24-33.51 6.95-7.34 11.17-4.22 26.18 6.95 33.51 66.27 43.49 105.82 116.6 105.82 195.58 0 78.98-39.55 152.09-105.82 195.58-11.17 7.32-14.29 22.34-6.95 33.5 7.04 10.71 21.93 14.56 33.51 6.95C528.27 439.58 576 351.33 576 256S528.27 72.43 448.35 19.97zM480 256c0-63.53-32.06-121.94-85.77-156.24-11.19-7.14-26.03-3.82-33.12 7.46s-3.78 26.21 7.41 33.36C408.27 165.97 432 209.11 432 256s-23.73 90.03-63.48 115.42c-11.19 7.14-14.5 22.07-7.41 33.36 6.51 10.36 21.12 15.14 33.12 7.46C447.94 377.94 480 319.54 480 256zm-141.77-76.87c-11.58-6.33-26.19-2.16-32.61 9.45-6.39 11.61-2.16 26.2 9.45 32.61C327.98 228.28 336 241.63 336 256c0 14.38-8.02 27.72-20.92 34.81-11.61 6.41-15.84 21-9.45 32.61 6.43 11.66 21.05 15.8 32.61 9.45 28.23-15.55 45.77-45 45.77-76.88s-17.54-61.32-45.78-76.86z"></path>
+                </svg>
+              </div>
+            </a>
+          </v-card-text>
+          <div id="text-player-container">
+            <audio id="text-player" v-if="textAudio" :src="textAudio" controls autoplay></audio>
+          </div>
+          <v-card-actions>
+            <v-btn @click="playText()">Lees hele tekst voor</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-flex>
+    </v-row>
+  </v-container>
 </template>
 
 <script>
@@ -25,10 +58,12 @@
   import VuetifyLogo from '~/components/VuetifyLogo.vue'
 
   export default {
+
     components: {
       Logo,
       VuetifyLogo
     },
+
     data: function () {
       return {
         analysis: '',
@@ -38,33 +73,64 @@
           "detectOrientation": "true",
           // "language": "en",
         },
+        textRegions: null,
+        readedWords: null,
+        readedText: null,
         snapDisable: true,
-        apiKey: process.env.COMPUTER_VISION_SUBSCRIPTION_KEY
+        snapTaken: "false",
+        speechToken: null,
+        textAudio: null
       }
     },
-    mounted() {
-      // this.postData()
+
+    watch: {
+
+      textRegions: function ( regions ) {
+        if ( regions.length > 0 ) {
+          const wsText = regions.map ( region => region.lines.map ( line => line.words.map ( word => word.text ).join ( ' ' ) ).join ( ' ' ) ).join ( ' ' );
+          const splitText = wsText.split ( '-' );
+          const text = splitText.map ( section => {
+            if ( section[ 0 ] === ' ' ) {
+              return section.substr ( 1 )
+            } else return section
+          } ).join ( '' );
+          this.readedText = text;
+          this.readedWords = text.split ( ' ' );
+        }
+      }
     },
+
+    mounted() {
+    },
+
     methods: {
-      postData: async function ( params ) {
-        const res = await this.$axios ( {
-          method: 'post',
-          url: 'https://northeurope.api.cognitive.microsoft.com/vision/v2.1/analyze?visualFeatures=Description&language=en',
-          data: {
-            params: this.params,
-            url: __dirname + "/exImg.jpg"
-          },
-          headers: {
-            "Content-Type": 'application/json',
-            "Ocp-Apim-Subscription-Key": process.env.COMPUTER_VISION_SUBSCRIPTION_KEY
-          }
-        } );
-        this.analysis = res
+
+      noLink: function ( e ) {
+        e.preventDefault ()
+      },
+
+      playWord: async function ( e ) {
+        const wordEl = e.target.parentElement.parentElement;
+        e.target.classList.toggle ( 'waiting' );
+        const audio = await new Audio ( this.createTtsHref ( wordEl.innerText ) );
+        e.target.classList.toggle ( 'waiting' );
+        audio.play ();
+      },
+
+      playText: function () {
+        if ( this.textAudio === null ) {
+          this.textAudio = this.createTtsHref ( this.readedText );
+        } else {
+          document.getElementById ( 'text-player' ).play ();
+        }
+      },
+
+      createTtsHref: function ( text ) {
+        return `/tts/${ encodeURIComponent ( text ) }`
       },
 
       startWebcam: function () {
         const vid = document.querySelector ( 'video' );
-        // request cam
         navigator.mediaDevices.getUserMedia ( {
           video: true
         } )
@@ -74,7 +140,7 @@
             return vid.play ();
           } )
           .then ( () => {
-            var btn = document.querySelector ( '#takeSnap' );
+            const btn = document.querySelector ( '#takeSnap' );
             this.snapDisable = false;
             btn.addEventListener ( 'click', ( e ) => {
               this.takeSnap ()
@@ -87,21 +153,15 @@
       },
 
       takeSnap: function () {
-
-        // get video element
+        this.snapTaken = true;
+        this.textAudio = null;
         const vid = document.querySelector ( 'video' );
-        // get canvas element
         const canvas = document.querySelector ( 'canvas' );
-        // get its context
         const ctx = canvas.getContext ( '2d' );
-        // set its size to the one of the video
         canvas.width = vid.videoWidth;
         canvas.height = vid.videoHeight;
-        // show snapshot on canvas
         ctx.drawImage ( vid, 0, 0 );
-        // show spinner image below
         return new Promise ( ( res, rej ) => {
-          // request a Blob from the canvas
           canvas.toBlob ( res, 'image/jpeg' );
         } );
       },
@@ -117,44 +177,46 @@
 
       analyseImage: function ( image, params, cb ) {
 
-        // create API url by adding params
-        const paramString = Object.entries ( params ).map ( ( [ key, val ] ) => `${ key }=${ val }` ).join ( '&' );
-        const urlWithParams = 'https://northeurope.api.cognitive.microsoft.com/vision/v2.0/ocr' + "?" + paramString;
+        const encodedParams = Object.entries ( params ).map ( ( [ key, val ] ) => `${ key }=${ val }` ).join ( '&' );
+        const url = `${ process.env.COMPUTER_VISION_ENDPOINT }/ocr?${ encodedParams }`;
 
-        // do API call
-        fetch ( urlWithParams, {
+        fetch ( url, {
           method: "POST",
           headers: {
             "Content-Type": "application/octet-stream",
-            "Ocp-Apim-Subscription-Key": this.apiKey
+            "Ocp-Apim-Subscription-Key": process.env.COMPUTER_VISION_SUBSCRIPTION_KEY
           },
           processData: false,
           body: image,
         } )
-          // then turn response into json
           .then ( response => response.json () )
-          // then go to processingFunction
           .then ( json => cb ( json ) )
-          // show alert window if something goes wrong
           .catch ( error => alert ( error.message ) );
       },
       handleData: function ( data ) {
-        console.log ( data );
-
         const canvas = document.querySelector ( 'canvas' );
         const ctx = canvas.getContext ( '2d' );
-        if (data.regions) {
-          data.regions.forEach ( textRegion => {
+        if ( data.regions ) {
+          this.textRegions = data.regions.filter ( ( region, index ) => index < data.regions.length / 2 );
+          this.textRegions.forEach ( textRegion => {
             ctx.beginPath ();
             ctx.strokeStyle = 'green';
             ctx.strokeRect ( ...textRegion.boundingBox.split ( ',' ) );
             ctx.closePath ();
-            if (textRegion.lines) {
+            if ( textRegion.lines ) {
               textRegion.lines.forEach ( line => {
                 ctx.beginPath ();
                 ctx.strokeStyle = 'red';
                 ctx.strokeRect ( ...line.boundingBox.split ( ',' ) );
                 ctx.closePath ();
+                if ( line.words.length > 1 ) {
+                  line.words.forEach ( word => {
+                    ctx.beginPath ();
+                    ctx.strokeStyle = 'blue';
+                    ctx.strokeRect ( ...word.boundingBox.split ( ',' ) );
+                    ctx.closePath ();
+                  } )
+                }
               } );
             }
           } );
@@ -164,13 +226,87 @@
   }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+
+  @keyframes breathe {
+    0% {
+      color: #2196F3;
+    }
+    50% {
+      color: #00CD84;
+    }
+  }
+
   video {
     width: 100%;
   }
+
   @media (min-width: 1264px) {
     .container {
       max-width: 1400px !important;
     }
   }
+
+  [data-snap-taken="false"] {
+    display: none;
+  }
+
+  [data-snap-taken="true"] {
+    display: block;
+  }
+
+  a.word {
+    text-decoration: dotted;
+    color: #FFFFFF;
+    position: relative;
+    z-index: 1;
+  }
+
+  a.word div {
+    position: absolute;
+    display: none;
+    z-index: 2;
+    padding: 16px;
+    background-color: #373737;
+    transform: translateX(-50%);
+    top: calc(-16px - 16px - 50px - 5px);
+    left: 50%;
+  }
+
+  a.word div svg {
+    width: 50px;
+  }
+
+  a.word:hover {
+    color: #2196F3;
+  }
+
+  a.word:hover > div {
+    display: block;
+  }
+
+  a.word div:after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    width: 20px;
+    transform: translateX(-50%);
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 10px solid #373737;
+    border-radius: 3px;
+    height: 10px;
+  }
+
+  .waiting {
+    animation: breathe 1s infinite;
+  }
+
+  #text-player-container {
+    margin: 12px;
+    padding: 0 16px 16px;
+  }
+
+
 </style>
