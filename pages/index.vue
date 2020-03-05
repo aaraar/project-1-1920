@@ -178,13 +178,13 @@
       analyseImage: function ( image, params, cb ) {
 
         const encodedParams = Object.entries ( params ).map ( ( [ key, val ] ) => `${ key }=${ val }` ).join ( '&' );
-        const url = `${ process.env.COMPUTER_VISION_ENDPOINT }/ocr?${ encodedParams }`;
+        const url = `${ process.env.computerVisionEndpoint }/ocr?${ encodedParams }`;
 
         fetch ( url, {
           method: "POST",
           headers: {
             "Content-Type": "application/octet-stream",
-            "Ocp-Apim-Subscription-Key": process.env.COMPUTER_VISION_SUBSCRIPTION_KEY
+            "Ocp-Apim-Subscription-Key": process.env.computerVisionSubscriptionKey
           },
           processData: false,
           body: image,

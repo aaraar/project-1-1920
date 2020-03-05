@@ -1,6 +1,14 @@
-const colors = require('vuetify/es5/util/colors').default
+const colors = require ( 'vuetify/es5/util/colors' ).default
 
 module.exports = {
+  env: {
+    baseUrl: process.env.BASE_URL || 'localhost:3000',
+    computerVisionSubscriptionKey: process.env.COMPUTER_VISION_SUBSCRIPTION_KEY,
+    computerSpeechServiceResource: process.env.SPEECH_SERVICE_RESOURCE_NAME,
+    speechServiceSubscriptionKey: process.envSPEECH_SERVICE_SUBSCRIPTION_KEY,
+    computerVisionEndpoint: process.env.COMPUTER_VISION_ENDPOINT || 'https://westeurope.api.cognitive.microsoft.com/vision/v2.0/',
+    speechServiceEndpoint: process.env.SPEECH_SERVICE_ENDPOINT || 'https://westeurope.api.cognitive.microsoft.com/sts/v1.0/issueToken'
+  },
   mode: 'universal',
   /*
   ** Headers of the page
@@ -24,13 +32,12 @@ module.exports = {
   /*
   ** Global CSS
   */
-  css: [
-  ],
+  css: [],
   /*
   ** Plugins to load before mounting the App
   // */
   plugins: [
-  //   '~/plugins/responsiveVoice'
+    //   '~/plugins/responsiveVoice'
   ],
   /*
   ** Nuxt.js dev-modules
@@ -52,14 +59,13 @@ module.exports = {
   ** Axios module configuration
   ** See https://axios.nuxtjs.org/options
   */
-  axios: {
-  },
+  axios: {},
   /*
   ** vuetify module configuration
   ** https://github.com/nuxt-community/vuetify-module
   */
   vuetify: {
-    customVariables: ['~/assets/variables.scss'],
+    customVariables: [ '~/assets/variables.scss' ],
     theme: {
       dark: true,
       themes: {
@@ -82,7 +88,7 @@ module.exports = {
     /*
     ** You can extend webpack config here
     */
-    extend (config, ctx) {
+    extend( config, ctx ) {
     }
   }
 };
