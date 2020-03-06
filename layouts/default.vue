@@ -1,6 +1,15 @@
 <template>
-  <v-app dark>
-    <v-content>
+  <v-app baseline>
+    <v-app-bar
+      :clipped-left="clipped"
+      fixed
+      app
+      color="red"
+      dark
+    >
+      <v-toolbar-title><strong>OBA</strong> Metis</v-toolbar-title>
+    </v-app-bar>
+      <v-content>
         <nuxt />
     </v-content>
     <v-footer

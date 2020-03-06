@@ -1,7 +1,7 @@
 <template>
   <v-container>
     <v-row>
-      <v-flex row wrap justify="center" class="justify-center">
+      <v-flex row wrap class="justify-center">
         <v-card class="ma-3">
           <v-card-title class="headline">
             Live
@@ -257,7 +257,7 @@
 
   a.word {
     text-decoration: dotted;
-    color: #FFFFFF;
+    color: rgba(0, 0, 0, 0.87);
     position: relative;
     z-index: 1;
   }
@@ -267,7 +267,7 @@
     display: none;
     z-index: 2;
     padding: 16px;
-    background-color: #373737;
+    background-color: #E6E6E6;
     transform: translateX(-50%);
     top: calc(-16px - 16px - 50px - 5px);
     left: 50%;
@@ -288,13 +288,13 @@
   a.word div:after {
     content: '';
     position: absolute;
-    top: 100%;
+    top: 95%;
     left: 50%;
     width: 20px;
     transform: translateX(-50%);
     border-left: 10px solid transparent;
     border-right: 10px solid transparent;
-    border-top: 10px solid #373737;
+    border-top: 10px solid #e6e6e6;
     border-radius: 3px;
     height: 10px;
   }
@@ -306,6 +306,10 @@
   #text-player-container {
     margin: 12px;
     padding: 0 16px 16px;
+  }
+
+  #sourceImage {
+    width: 100%;
   }
 
 
